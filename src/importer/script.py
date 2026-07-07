@@ -156,12 +156,12 @@ def create_takhtit(api_url):
 
     hafs_uuid = None
     for mushaf in mushafs:
-        if mushaf.get("short_name") == "hafs":
+        if mushaf.get("slug") == "hafs":
             hafs_uuid = mushaf.get("uuid")
             break
 
     if not hafs_uuid:
-        print("Could not find Mushaf with short_name 'hafs'.")
+        print("Could not find Mushaf with slug 'hafs'.")
         sys.exit(1)
 
     payload = {"mushaf_uuid": hafs_uuid, "account_uuid": account_uuid}
@@ -292,6 +292,7 @@ def main(args):
             print(f"Status code: {response.status_code}")
             if not (200 <= response.status_code < 300):
                 print(f"Import failed with status code: {response.status_code}")
+                print(f"Response body (as plain/text): {response.text}")
                 sys.exit(1)
             try:
                 print("Response:", response.json())
