@@ -133,18 +133,20 @@ periods = {
 }
 
 class Mushaf():
-    def __init__(self, short_name, name, source):
+    def __init__(self, slug, name, source):
         self.name = name
-        self.short_name = short_name
+        self.slug = slug
         self.source = source
 
 BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
 
 class Surah():
-    def __init__(self, name, number):
+    def __init__(self, name, number, has_bismillah, bismillah_text):
         self.name = name
         self.period = periods.get(number)
         self.number = number
+        self.has_bismillah = has_bismillah
+        self.bismillah_text = bismillah_text
         self.ayahs = []
 
     def ayahs_from_xml(self, surah):
@@ -158,10 +160,9 @@ class Surah():
                 self.number,
                 int(aya_index),
                 is_bismillah,
-                ayah.attrib.get('bismillah', None),
             ).words_from_xml(ayah))
 
-        self.ayahs=ayahs
+        self.ayahs = ayahs
 
         return self
 
@@ -172,11 +173,10 @@ class Word():
         self.text = text
 
 class Ayah():
-    def __init__(self,  surah_number, ayah_number, is_bismillah, bismillah_text):
+    def __init__(self,  surah_number, ayah_number, is_bismillah):
         self.number = ayah_number
         self.sajdah = sajdahs.get((surah_number, ayah_number), None)
         self.is_bismillah = is_bismillah
-        self.bismillah_text = bismillah_text
         self.words = []
 
     def words_from_xml(self, ayah):
@@ -203,6 +203,8 @@ class Quran():
     
     def surahs_from_xml(self, root):
         for surah in root.iter('sura'):
-            surah = Surah(surah.attrib['name'], int(surah.attrib['index'])).ayahs_from_xml(surah)
+            # Check if surah has bismillah
+            first_ayah_bismillah = surah.findall('aya')[0].attrib.get("bismillah", False)
+            surah = Surah(surah.attrib['name'], int(surah.attrib['index']), bool(first_ayah_bismillah), first_ayah_bismillah or None).ayahs_from_xml(surah)
             self.surahs.append(surah)
         return self
