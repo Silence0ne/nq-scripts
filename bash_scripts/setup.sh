@@ -4,13 +4,14 @@
 # NatiqQuran API Full Setup Script
 #==============================================================================
 # Description: Orchestrates the complete setup process for NatiqQuran API
-#              by executing startup and docker-init scripts in sequence.
-# Version: 2.0.0
+#              by executing the local startup and docker-init scripts
+#              (shipped alongside this script) in sequence.
+# Version: 3.0.0
 # Author: Natiq Development Team
-# Usage: 
-#   Interactive menu: ./full_setup.sh
-#   Full setup: ./full_setup.sh --full [options]
-#   Update mode: ./full_setup.sh -u /path/to/quran-api [options]
+# Usage:
+#   Interactive menu: ./setup.sh
+#   Full setup: ./setup.sh --full [options]
+#   Update mode: ./setup.sh -u /path/to/quran-api [options]
 #==============================================================================
 
 set -euo pipefail
@@ -19,8 +20,12 @@ set -euo pipefail
 # SCRIPT METADATA
 #==============================================================================
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_VERSION="3.0.0"
 readonly SCRIPT_AUTHOR="Natiq Development Team"
+
+# Directory this script lives in — sibling scripts (startup.sh, docker_init.sh)
+# are expected to sit right next to it (e.g. inside bash_scripts/).
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 #==============================================================================
 # PROJECT CONFIGURATION
@@ -28,22 +33,17 @@ readonly SCRIPT_AUTHOR="Natiq Development Team"
 readonly PROJECT_FOLDER="quran-api"
 
 #==============================================================================
-# REMOTE SCRIPT URLS
+# LOCAL SIBLING SCRIPTS
 #==============================================================================
-readonly STARTUP_SCRIPT_URL="https://raw.githubusercontent.com/NatiqQuran/nq-scripts/main/bash_scripts/startup.sh"
-readonly DOCKER_INIT_SCRIPT_URL="https://raw.githubusercontent.com/natiq-foundation/nq-scripts/refs/heads/main/bash_scripts/docker_init.sh"
+readonly STARTUP_SCRIPT_PATH="${SCRIPT_DIR}/startup.sh"
+readonly DOCKER_INIT_SCRIPT_PATH="${SCRIPT_DIR}/docker_init.sh"
 
 #==============================================================================
-# DOCKER CONFIGURATION FILES
+# DOCKER CONFIGURATION FILES (still fetched by docker_init.sh itself)
 #==============================================================================
 readonly COMPOSE_FILE_URL="https://raw.githubusercontent.com/natiq-foundation/quran-api/refs/heads/main/docker-compose.yaml"
 readonly NGINX_CONFIG_URL="https://raw.githubusercontent.com/natiq-foundation/quran-api/refs/heads/main/nginx.conf"
-
-#==============================================================================
-# SCRIPT SETTINGS
-#==============================================================================
-readonly DOWNLOAD_TIMEOUT=30
-readonly TEMP_SCRIPT_DIR="/tmp"
+readonly RABBITMQ_CONFIG_URL="https://raw.githubusercontent.com/natiq-foundation/quran-api/refs/heads/main/rabbitmq.conf"
 
 #==============================================================================
 # TERMINAL COLORS
@@ -111,24 +111,36 @@ check_dependencies() {
     log_success "All dependencies are available"
 }
 
-validate_downloaded_script() {
+validate_local_script() {
     local file_path="$1"
-    if [[ ! -s "$file_path" ]]; then
-        log_error "Downloaded file is empty or missing: $file_path"
+
+    if [[ ! -e "$file_path" ]]; then
+        log_error "Required script not found next to $SCRIPT_NAME: $file_path"
+        log_error "Make sure this script stays inside the cloned repo's bash_scripts/ folder."
         return 1
     fi
-    
+
+    if [[ ! -s "$file_path" ]]; then
+        log_error "Script is empty: $file_path"
+        return 1
+    fi
+
+    if [[ ! -r "$file_path" ]]; then
+        log_error "Script is not readable: $file_path"
+        return 1
+    fi
+
     local first_line
     first_line="$(head -n 1 "$file_path" 2>/dev/null || true)"
     if [[ ! "$first_line" =~ ^#! ]]; then
-        log_error "Downloaded script missing shebang: $file_path"
+        log_error "Script missing shebang: $file_path"
         return 1
     fi
-    
+
     if [[ ! "$first_line" =~ bash && ! "$first_line" =~ sh ]]; then
         log_warning "Shebang does not reference bash/sh: $first_line"
     fi
-    
+
     return 0
 }
 
@@ -158,41 +170,29 @@ return_to_initial_directory() {
 }
 
 #==============================================================================
-# SCRIPT DOWNLOAD AND EXECUTION
+# LOCAL SCRIPT EXECUTION
 #==============================================================================
 
-download_and_execute_script() {
-    local script_url="$1"
+execute_local_script() {
+    local script_path="$1"
     local script_name="$2"
     shift 2
     local script_options=("$@")
-    
-    local temp_script_path="${TEMP_SCRIPT_DIR}/${script_name}_$$.sh"
-    
-    log_info "Downloading $script_name from remote repository..."
-    
-    if ! curl -fsSL --connect-timeout "$DOWNLOAD_TIMEOUT" "$script_url" -o "$temp_script_path"; then
-        log_error "Failed to download $script_name from: $script_url"
+
+    if ! validate_local_script "$script_path"; then
         return 1
     fi
-    
-    if ! validate_downloaded_script "$temp_script_path"; then
-        rm -f "$temp_script_path"
-        return 1
-    fi
-    
-    chmod +x "$temp_script_path"
-    
+
+    chmod +x "$script_path"
+
     log_info "Executing $script_name with options: ${script_options[*]:-none}"
-    
-    if bash "$temp_script_path" "${script_options[@]}"; then
+
+    if bash "$script_path" "${script_options[@]}"; then
         log_success "$script_name completed successfully"
-        rm -f "$temp_script_path"
         return 0
     else
         local exit_code=$?
         log_error "$script_name failed with exit code: $exit_code"
-        rm -f "$temp_script_path"
         return "$exit_code"
     fi
 }
@@ -202,7 +202,7 @@ download_and_execute_script() {
 #==============================================================================
 
 show_interactive_menu() {
-    
+
     echo "Please select an option:"
     echo
     echo -e "  ${COLOR_GREEN}1)${COLOR_RESET} Full Setup"
@@ -213,11 +213,11 @@ show_interactive_menu() {
     echo
     echo -e "  ${COLOR_YELLOW}0)${COLOR_RESET} Exit"
     echo
-    
+
     local choice
     read -rp "Enter your choice [0-2]: " choice
     echo
-    
+
     case "$choice" in
         1)
             log_info "Selected: Full Setup"
@@ -226,30 +226,30 @@ show_interactive_menu() {
         2)
             log_info "Selected: Update Docker Environment"
             EXECUTION_MODE="update"
-            
+
             echo -e "${COLOR_BOLD}Available directories in current path:${COLOR_RESET}"
             echo
-            
+
             if ls -d */ 2>/dev/null | head -10; then
                 echo
             else
                 log_warning "No directories found in current path"
                 echo
             fi
-            
+
             read -rp "Enter path to $PROJECT_FOLDER directory: " UPDATE_TARGET_DIR
             echo
-            
+
             if [[ -z "$UPDATE_TARGET_DIR" ]]; then
                 log_error "Directory path cannot be empty"
                 exit 1
             fi
-            
+
             if [[ ! -d "$UPDATE_TARGET_DIR" ]]; then
                 log_error "Directory does not exist: $UPDATE_TARGET_DIR"
                 exit 1
             fi
-            
+
             log_success "Target directory validated: $UPDATE_TARGET_DIR"
             ;;
         0)
@@ -261,7 +261,7 @@ show_interactive_menu() {
             exit 1
             ;;
     esac
-    
+
     echo
 }
 
@@ -272,51 +272,51 @@ show_interactive_menu() {
 run_full_setup_workflow() {
     log_info "Starting full setup workflow..."
     echo
-    
+
     # Step 1: Execute startup script
     log_step "1/2" "Running startup script"
-    download_and_execute_script "$STARTUP_SCRIPT_URL" "startup" "${STARTUP_OPTIONS[@]}"
+    execute_local_script "$STARTUP_SCRIPT_PATH" "startup" "${STARTUP_OPTIONS[@]}"
     echo
-    
+
     # Step 2: Setup Docker environment
     log_step "2/2" "Setting up Docker environment"
-    
+
     create_directory_if_not_exists "$PROJECT_FOLDER"
     change_directory_safely "$PROJECT_FOLDER"
-    
-    local docker_args=("-y" "$COMPOSE_FILE_URL" "-n" "$NGINX_CONFIG_URL")
+
+    local docker_args=("-y" "$COMPOSE_FILE_URL" "-n" "$NGINX_CONFIG_URL" "-r" "$RABBITMQ_CONFIG_URL")
     docker_args+=("${DOCKER_INIT_OPTIONS[@]}")
-    
-    download_and_execute_script "$DOCKER_INIT_SCRIPT_URL" "docker-init" "${docker_args[@]}"
-    
+
+    execute_local_script "$DOCKER_INIT_SCRIPT_PATH" "docker-init" "${docker_args[@]}"
+
     return_to_initial_directory
     echo
-    
+
     log_success "Full setup completed successfully!"
 }
 
 run_update_workflow() {
     log_info "Starting update workflow..."
     echo
-    
+
     if [[ ! -d "$UPDATE_TARGET_DIR" ]]; then
         log_error "Target directory does not exist: $UPDATE_TARGET_DIR"
         log_error "Please provide a valid directory path."
         exit 1
     fi
-    
+
     log_step "1/1" "Updating Docker environment in: $UPDATE_TARGET_DIR"
-    
+
     change_directory_safely "$UPDATE_TARGET_DIR"
-    
-    local docker_args=("-y" "$COMPOSE_FILE_URL" "-u" "-n" "$NGINX_CONFIG_URL")
+
+    local docker_args=("-y" "$COMPOSE_FILE_URL" "-u" "-n" "$NGINX_CONFIG_URL" "-r" "$RABBITMQ_CONFIG_URL")
     docker_args+=("${DOCKER_INIT_OPTIONS[@]}")
-    
-    download_and_execute_script "$DOCKER_INIT_SCRIPT_URL" "docker-init" "${docker_args[@]}"
-    
+
+    execute_local_script "$DOCKER_INIT_SCRIPT_PATH" "docker-init" "${docker_args[@]}"
+
     return_to_initial_directory
     echo
-    
+
     log_success "Update completed successfully!"
 }
 
@@ -334,7 +334,7 @@ parse_command_line_arguments() {
                 EXECUTION_MODE="full"
                 shift
                 ;;
-            
+
             # ============================================================
             # Update Mode
             # ============================================================
@@ -347,7 +347,7 @@ parse_command_line_arguments() {
                 UPDATE_TARGET_DIR="$2"
                 shift 2
                 ;;
-            
+
             # ============================================================
             # Startup Script Options
             # ============================================================
@@ -367,7 +367,7 @@ parse_command_line_arguments() {
                 STARTUP_OPTIONS+=("--debug")
                 shift
                 ;;
-            
+
             # ============================================================
             # Docker-Init Script Options
             # ============================================================
@@ -379,7 +379,7 @@ parse_command_line_arguments() {
                 DOCKER_INIT_OPTIONS+=("-f")
                 shift
                 ;;
-            
+
             # ============================================================
             # Main Script Options
             # ============================================================
@@ -391,7 +391,7 @@ parse_command_line_arguments() {
                 show_version
                 exit 0
                 ;;
-            
+
             # ============================================================
             # Unknown Option
             # ============================================================
@@ -403,7 +403,7 @@ parse_command_line_arguments() {
                 ;;
         esac
     done
-    
+
     if [[ "$EXECUTION_MODE" == "update" && -z "$UPDATE_TARGET_DIR" ]]; then
         log_error "Update mode requires a target directory path"
         log_error "Usage: $SCRIPT_NAME -u /path/to/$PROJECT_FOLDER"
@@ -487,17 +487,19 @@ ${COLOR_BOLD}WORKFLOW:${COLOR_RESET}
         2. Execute selected workflow
 
     ${COLOR_GREEN}Full Setup Mode:${COLOR_RESET}
-        1. Execute startup.sh (system preparation)
-        2. Create $PROJECT_FOLDER/ and run docker-init.sh
+        1. Execute the local startup.sh (system preparation)
+        2. Create $PROJECT_FOLDER/ and run the local docker_init.sh
 
     ${COLOR_YELLOW}Update Mode:${COLOR_RESET}
         1. Navigate to specified directory
-        2. Execute docker-init.sh with update flag
+        2. Execute the local docker_init.sh with update flag
         3. Return to original directory
 
 ${COLOR_BOLD}REQUIREMENTS:${COLOR_RESET}
-    - curl
+    - curl (used by docker_init.sh to fetch docker-compose.yaml / nginx.conf)
     - bash
+    - This script must remain inside the cloned repo, alongside startup.sh
+      and docker_init.sh (i.e. inside bash_scripts/)
 
 ${COLOR_BOLD}NOTE:${COLOR_RESET}
     Running without arguments shows an interactive menu.
@@ -514,15 +516,15 @@ EOF
 main() {
     log_info "NatiqQuran API Setup (v$SCRIPT_VERSION)"
     echo
-    
+
     check_dependencies
     echo
-    
+
     if [[ $EUID -ne 0 ]]; then
         log_warning "Some steps may require root privileges. If a step fails, try: sudo $SCRIPT_NAME ..."
         echo
     fi
-    
+
     # If no arguments provided, show interactive menu
     if [[ $# -eq 0 ]]; then
         show_interactive_menu
@@ -530,14 +532,14 @@ main() {
         # Parse command line arguments
         parse_command_line_arguments "$@"
     fi
-    
+
     # Execute appropriate workflow
     if [[ "$EXECUTION_MODE" == "update" ]]; then
         run_update_workflow
     else
         run_full_setup_workflow
     fi
-    
+
     echo
     log_success "All operations completed successfully!"
 }
