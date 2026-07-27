@@ -78,6 +78,7 @@ ${BOLD}REQUIRED:${NC}
 
 ${BOLD}OPTIONS:${NC}
     ${GREEN}-n <source>${NC}     Path or URL to nginx.conf (optional)
+    ${GREEN}-r <source>${NC}     Path or URL to rabbitmq.conf (optional)
     ${GREEN}-e <filename>${NC}   Output .env filename (default: .env)
     ${GREEN}-u${NC}              Pull latest images on startup
     ${GREEN}-f${NC}              Force yes to all prompts (non-interactive)
@@ -88,6 +89,7 @@ ${BOLD}EXAMPLES:${NC}
     $0 -y docker-compose.yaml
     $0 -f -y ./compose.yaml -e .env.prod
     $0 -y https://example.com/docker-compose.yaml -u
+    $0 -y ./compose.yaml -n ./nginx.conf -r ./rabbitmq.conf
 
 ${BOLD}EXIT CODES:${NC}
     0   Success
@@ -106,11 +108,13 @@ EOF
 parse_args() {
   compose_source=""
   nginx_source=""
-  
-  while getopts ":y:n:e:ufl:h" opt; do
+  rabbitmq_source=""
+
+  while getopts ":y:n:r:e:ufl:h" opt; do
     case "$opt" in
       y) compose_source="$OPTARG" ;;
       n) nginx_source="$OPTARG" ;;
+      r) rabbitmq_source="$OPTARG" ;;
       e) ENV_OUTPUT="$OPTARG" ;;
       u) PULL_LATEST=true ;;
       f) FORCE_YES=true ;;
@@ -573,6 +577,19 @@ retrieve_nginx() {
   fi
 }
 
+# Retrieve optional rabbitmq.conf
+retrieve_rabbitmq() {
+  if [[ -z "${rabbitmq_source:-}" ]]; then
+    return 0
+  fi
+
+  newline
+  info "=== Retrieving rabbitmq.conf ==="
+  if ! get_file "$rabbitmq_source" "rabbitmq.conf"; then
+    warn "Failed to retrieve rabbitmq.conf - continuing without it"
+  fi
+}
+
 # Print final summary
 print_summary() {
   newline
@@ -583,6 +600,7 @@ print_summary() {
   echo "  ${GREEN}✓${NC} Docker Compose: $COMPOSE_FILE"
   echo "  ${GREEN}✓${NC} Environment:    $ENV_OUTPUT"
   [[ -f "nginx.conf" ]] && echo "  ${GREEN}✓${NC} Nginx Config:   nginx.conf"
+  [[ -f "rabbitmq.conf" ]] && echo "  ${GREEN}✓${NC} RabbitMQ Config: rabbitmq.conf"
   
   newline
   info "Next steps:"
@@ -607,6 +625,7 @@ main() {
 
   retrieve_compose
   retrieve_nginx
+  retrieve_rabbitmq
   generate_env
   run_compose "$COMPOSE_FILE" "$ENV_OUTPUT"
   print_summary
