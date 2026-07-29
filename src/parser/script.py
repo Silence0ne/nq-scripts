@@ -11,18 +11,18 @@ import os
 
 USAGE = """Natiq Quran Exporter
 Usage:
-    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> [--pretty]
+    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <colllector_name> <compiler_name> [--pretty]
     python script.py translation <path_to_translation_xml_file> <mushaf_slug> <language> <author> [--pretty]
     python script.py translation-bulk <path_to_translations_dir> <output_dir> <mushaf_slug> [--pretty]
 """
 
-def quran_xml_into_json(file_path, mushaf_name, mushaf_full_name, mushaf_source,pretty = False,):
+def quran_xml_into_json(file_path, mushaf_name, mushaf_full_name, mushaf_source, collector_name, compiler_name, pretty = False,):
     with open(file_path, 'r') as file:
         content = file.read().encode("utf-8")
 
     root = ET.fromstring(content)
 
-    quran = Quran(Mushaf(mushaf_name, mushaf_full_name, mushaf_source))\
+    quran = Quran(Mushaf(mushaf_name, mushaf_full_name, mushaf_source, collector_name, compiler_name))\
             .surahs_from_xml(root)
 
     return json.dumps(quran, default=vars, ensure_ascii=False, indent=(pretty and 4) or None)
@@ -50,8 +50,10 @@ def main(args):
             mushaf_name = args[3]
             mushaf_full_name = args[4]
             mushaf_source = args[5]
-            pretty = (args[6] == "--pretty") if len(args) > 7 else False
-            json = quran_xml_into_json(args[2], mushaf_name, mushaf_full_name, mushaf_source,pretty)
+            collector_name = args[6]
+            compiler_name = args[7]
+            pretty = (args[8] == "--pretty") if len(args) > 9 else False
+            json = quran_xml_into_json(args[2], mushaf_name, mushaf_full_name, mushaf_source,collector_name, compiler_name, pretty)
             with open(f"{mushaf_name}.json", "w", encoding="utf-8") as file:
                 file.write(json)
 
