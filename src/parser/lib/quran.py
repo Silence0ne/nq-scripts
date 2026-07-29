@@ -133,10 +133,12 @@ periods = {
 }
 
 class Mushaf():
-    def __init__(self, slug, name, source):
+    def __init__(self, slug, name, source, collector_name, compiler_name):
         self.name = name
         self.slug = slug
         self.source = source
+        self.collector_name = collector_name
+        self.compiler_name = compiler_name
 
 BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
 
