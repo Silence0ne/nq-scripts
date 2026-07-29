@@ -2,7 +2,6 @@ import sys
 import os
 import requests
 import getpass
-import json
 import glob
 import secrets
 import string
@@ -10,28 +9,31 @@ import string
 TOKEN_FILE = os.path.expanduser("~/.importer_token")
 TAKHTIT_UUID_FILE = os.path.expanduser("~/.importer_takhtit_uuid")
 
+
 # Send the file as multipart/form-data
 def send_file_to_api(file_path, api_url, token=None):
     with open(file_path, "rb") as file:
-        files = {
-            "file": (os.path.basename(file_path), file, "application/json")
-        }
+        files = {"file": (os.path.basename(file_path), file, "application/json")}
         headers = {}
         if token:
             headers["Authorization"] = f"Token {token}"
-        response = requests.post(f'{api_url}/mushafs/import/', files=files, headers=headers)
+        response = requests.post(
+            f"{api_url}/mushafs/import/", files=files, headers=headers
+        )
         return response
+
 
 def send_translation_to_api(file_path, api_url, token=None):
     with open(file_path, "rb") as file:
-        files = {
-            "file": (os.path.basename(file_path), file, "application/json")
-        }
+        files = {"file": (os.path.basename(file_path), file, "application/json")}
         headers = {}
         if token:
             headers["Authorization"] = f"Token {token}"
-        response = requests.post(f'{api_url}/translations/import/', files=files, headers=headers)
+        response = requests.post(
+            f"{api_url}/translations/import/", files=files, headers=headers
+        )
         return response
+
 
 def login(api_url, username=None, password=None):
     if username is None:
@@ -55,16 +57,19 @@ def login(api_url, username=None, password=None):
         print(f"Login error: {e}")
         sys.exit(1)
 
+
 def load_token():
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, "r") as f:
             return f.read().strip()
     return None
 
+
 def save_takhtit_uuid(uuid):
     """Save takhtit UUID to file"""
     with open(TAKHTIT_UUID_FILE, "w") as f:
         f.write(uuid)
+
 
 def load_takhtit_uuid():
     """Load takhtit UUID from file"""
@@ -72,6 +77,7 @@ def load_takhtit_uuid():
         with open(TAKHTIT_UUID_FILE, "r") as f:
             return f.read().strip()
     return None
+
 
 def generate_strong_password(length: int = 16) -> str:
     if length < 8:
@@ -84,9 +90,12 @@ def generate_strong_password(length: int = 16) -> str:
         secrets.choice(string.digits),
         secrets.choice("-_@#$%"),
     ]
-    password_chars += [secrets.choice(alphabet) for _ in range(length - len(password_chars))]
+    password_chars += [
+        secrets.choice(alphabet) for _ in range(length - len(password_chars))
+    ]
     secrets.SystemRandom().shuffle(password_chars)
     return "".join(password_chars)
+
 
 def create_user(api_url):
     """Create a new user and return the account UUID"""
@@ -170,7 +179,7 @@ def create_takhtit(api_url):
         response = requests.post(f"{api_url}/takhtits/", headers=headers, json=payload)
         print("Create Takhtit response:")
         print(response.status_code, response.text)
-        
+
         if response.status_code == 201:
             takhtit_data = response.json()
             takhtit_uuid = takhtit_data.get("uuid")
@@ -186,6 +195,7 @@ def create_takhtit(api_url):
     except requests.exceptions.RequestException as e:
         print(f"Failed to create Takhtit: {e}")
         sys.exit(1)
+
 
 def import_takhtit(file_path, type_name, api_url):
     token = load_token()
@@ -214,10 +224,10 @@ def import_takhtit(file_path, type_name, api_url):
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f, "application/json")}
             response = requests.post(url, headers=headers, files=files)
-        
+
         print("Import response:")
         print(response.status_code, response.text)
-        
+
         if not (200 <= response.status_code < 300):
             print(f"Import failed with status code: {response.status_code}")
             sys.exit(1)
@@ -227,6 +237,7 @@ def import_takhtit(file_path, type_name, api_url):
     except Exception as e:
         print(f"Error during import: {e}")
         sys.exit(1)
+
 
 def main(args):
     if len(args) < 2:
@@ -244,13 +255,15 @@ def main(args):
 
     if command == "login":
         # Check for --non-interactive flag
-        if '--non-interactive' in args:
+        if "--non-interactive" in args:
             try:
-                flag_index = args.index('--non-interactive')
+                flag_index = args.index("--non-interactive")
                 # Remove the flag for easier indexing
-                args_wo_flag = args[:flag_index] + args[flag_index+1:]
+                args_wo_flag = args[:flag_index] + args[flag_index + 1 :]
                 if len(args_wo_flag) != 5:
-                    print("Usage: python script.py login <api_url> <username> <password> --non-interactive")
+                    print(
+                        "Usage: python script.py login <api_url> <username> <password> --non-interactive"
+                    )
                     sys.exit(1)
                 api_url = args_wo_flag[2]
                 username = args_wo_flag[3]
@@ -258,7 +271,9 @@ def main(args):
                 login(api_url, username, password)
                 return
             except Exception:
-                print("Usage: python script.py login <api_url> <username> <password> --non-interactive")
+                print(
+                    "Usage: python script.py login <api_url> <username> <password> --non-interactive"
+                )
                 sys.exit(1)
         else:
             if len(args) == 3:
@@ -272,7 +287,9 @@ def main(args):
                 login(api_url, username, password)
                 return
             else:
-                print("Usage: python script.py login <api_url> [username password] [--non-interactive]")
+                print(
+                    "Usage: python script.py login <api_url> [username password] [--non-interactive]"
+                )
                 sys.exit(1)
     elif command == "import-mushaf":
         if len(args) != 4:
@@ -283,7 +300,7 @@ def main(args):
         if not os.path.isfile(input_file):
             print(f"Error: File '{input_file}' does not exist.")
             sys.exit(1)
-        if not input_file.endswith('.json'):
+        if not input_file.endswith(".json"):
             print("Error: Input file must be a .json file.")
             sys.exit(1)
         token = load_token()
@@ -303,7 +320,9 @@ def main(args):
             sys.exit(1)
     elif command == "import-translations":
         if len(args) != 4:
-            print("Usage: python script.py import-translations <translations_dir> <api_url>")
+            print(
+                "Usage: python script.py import-translations <translations_dir> <api_url>"
+            )
             sys.exit(1)
         translations_dir = args[2]
         api_url = args[3]
@@ -311,14 +330,14 @@ def main(args):
             print(f"Error: Directory '{translations_dir}' does not exist.")
             sys.exit(1)
         token = load_token()
-        json_files = glob.glob(os.path.join(translations_dir, '*.json'))
+        json_files = glob.glob(os.path.join(translations_dir, "*.json"))
         if not json_files:
             print(f"No .json files found in directory '{translations_dir}'.")
             sys.exit(1)
-        
+
         success_count = 0
         failed_count = 0
-        
+
         for file_path in json_files:
             print(f"Importing {file_path}...")
             try:
@@ -337,20 +356,22 @@ def main(args):
             except Exception as e:
                 failed_count += 1
                 print(f"Failed to import {file_path}: {e}")
-        
+
         print(f"\nImport Summary: {success_count} successful, {failed_count} failed")
         if failed_count > 0:
             sys.exit(1)
     elif command == "import-translation":
         if len(args) != 4:
-            print("Usage: python script.py import-translation <input_json_file> <api_url>")
+            print(
+                "Usage: python script.py import-translation <input_json_file> <api_url>"
+            )
             sys.exit(1)
         input_file = args[2]
         api_url = args[3]
         if not os.path.isfile(input_file):
             print(f"Error: File '{input_file}' does not exist.")
             sys.exit(1)
-        if not input_file.endswith('.json'):
+        if not input_file.endswith(".json"):
             print("Error: Input file must be a .json file.")
             sys.exit(1)
         token = load_token()
@@ -380,6 +401,7 @@ def main(args):
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main(sys.argv)

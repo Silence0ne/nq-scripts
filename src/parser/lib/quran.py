@@ -132,7 +132,8 @@ periods = {
     114: "makki",
 }
 
-class Mushaf():
+
+class Mushaf:
     def __init__(self, slug, name, source, collector_name, compiler_name):
         self.name = name
         self.slug = slug
@@ -140,9 +141,11 @@ class Mushaf():
         self.collector_name = collector_name
         self.compiler_name = compiler_name
 
+
 BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
 
-class Surah():
+
+class Surah:
     def __init__(self, name, number, has_bismillah, bismillah_text):
         self.name = name
         self.period = periods.get(number)
@@ -154,28 +157,30 @@ class Surah():
     def ayahs_from_xml(self, surah):
         ayahs = []
 
-        for ayah in surah.findall('aya'):
-            is_bismillah = ayah.attrib['text'] == BISMILLAH
-            aya_index = ayah.attrib['index']
+        for ayah in surah.findall("aya"):
+            is_bismillah = ayah.attrib["text"] == BISMILLAH
+            aya_index = ayah.attrib["index"]
 
-            ayahs.append(Ayah(
-                self.number,
-                int(aya_index),
-                is_bismillah,
-            ).words_from_xml(ayah))
+            ayahs.append(
+                Ayah(
+                    self.number,
+                    int(aya_index),
+                    is_bismillah,
+                ).words_from_xml(ayah)
+            )
 
         self.ayahs = ayahs
 
         return self
 
 
-
-class Word():
+class Word:
     def __init__(self, text):
         self.text = text
 
-class Ayah():
-    def __init__(self,  surah_number, ayah_number, is_bismillah):
+
+class Ayah:
+    def __init__(self, surah_number, ayah_number, is_bismillah):
         self.number = ayah_number
         self.sajdah = sajdahs.get((surah_number, ayah_number), None)
         self.is_bismillah = is_bismillah
@@ -184,7 +189,7 @@ class Ayah():
     def words_from_xml(self, ayah):
         # remove the every sajdah char in the text
         # by replacing it with empty string
-        ayahtext_without_sajdah = ayah.attrib['text'].replace('۩', '')
+        ayahtext_without_sajdah = ayah.attrib["text"].replace("۩", "")
 
         # Get the array of aya words
         words = ayahtext_without_sajdah.split(" ")
@@ -198,15 +203,22 @@ class Ayah():
         return self
 
 
-class Quran():
+class Quran:
     def __init__(self, mushaf):
         self.mushaf = mushaf
         self.surahs = []
-    
+
     def surahs_from_xml(self, root):
-        for surah in root.iter('sura'):
+        for surah in root.iter("sura"):
             # Check if surah has bismillah
-            first_ayah_bismillah = surah.findall('aya')[0].attrib.get("bismillah", False)
-            surah = Surah(surah.attrib['name'], int(surah.attrib['index']), bool(first_ayah_bismillah), first_ayah_bismillah or None).ayahs_from_xml(surah)
+            first_ayah_bismillah = surah.findall("aya")[0].attrib.get(
+                "bismillah", False
+            )
+            surah = Surah(
+                surah.attrib["name"],
+                int(surah.attrib["index"]),
+                bool(first_ayah_bismillah),
+                first_ayah_bismillah or None,
+            ).ayahs_from_xml(surah)
             self.surahs.append(surah)
         return self
