@@ -3,7 +3,7 @@
 
 import sys
 import xml.etree.ElementTree as ET
-from lib.quran import Quran, Mushaf
+from lib.quran import Quran, RasmOlMushaf, Transmission
 from lib.translation import Translation, translation_metadata
 from lib.utils import remove_comments_from_xml, files_in_dir
 import json
@@ -11,7 +11,7 @@ import os
 
 USAGE = """Natiq Quran Exporter
 Usage:
-    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <colllector_name> <compiler_name> [--pretty]
+    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <colllector_name> <compiler_name (nullable)> <transmission_slug> <transmission_name> [--pretty]
     python script.py translation <path_to_translation_xml_file> <mushaf_slug> <language> <author> [--pretty]
     python script.py translation-bulk <path_to_translations_dir> <output_dir> <mushaf_slug> [--pretty]
 """
@@ -22,7 +22,8 @@ def quran_xml_into_json(
     mushaf_name,
     mushaf_full_name,
     mushaf_source,
-    collector_name,
+    transmission_slug,
+    transmission_name,
     compiler_name,
     pretty=False,
 ):
@@ -32,8 +33,12 @@ def quran_xml_into_json(
     root = ET.fromstring(content)
 
     quran = Quran(
-        Mushaf(
-            mushaf_name, mushaf_full_name, mushaf_source, collector_name, compiler_name
+        RasmOlMushaf(
+            mushaf_name,
+            mushaf_full_name,
+            mushaf_source,
+            compiler_name,
+            Transmission(transmission_slug, transmission_name),
         )
     ).surahs_from_xml(root)
 
@@ -68,22 +73,24 @@ def main(args):
     command = args[1]
     match command:
         case "quran":
-            mushaf_name = args[3]
-            mushaf_full_name = args[4]
-            mushaf_source = args[5]
-            collector_name = args[6]
-            compiler_name = args[7]
-            pretty = (args[8] == "--pretty") if len(args) > 9 else False
+            rasm_ol_mushaf_slug = args[3]
+            rasm_ol_mushaf_full_name = args[4]
+            rasm_ol_mushaf_source = args[5]
+            transmission_slug = args[6]
+            transmission_name = args[7]
+            compiler_name = args[8]
+            pretty = (args[9] == "--pretty") if len(args) > 9 else False
             json = quran_xml_into_json(
                 args[2],
-                mushaf_name,
-                mushaf_full_name,
-                mushaf_source,
-                collector_name,
-                compiler_name,
+                rasm_ol_mushaf_slug,
+                rasm_ol_mushaf_full_name,
+                rasm_ol_mushaf_source,
+                transmission_slug,
+                transmission_name,
+                None if compiler_name == "null" else compiler_name,
                 pretty,
             )
-            with open(f"{mushaf_name}.json", "w", encoding="utf-8") as file:
+            with open(f"{rasm_ol_mushaf_slug}.json", "w", encoding="utf-8") as file:
                 file.write(json)
 
         case "translation":

@@ -133,12 +133,25 @@ periods = {
 }
 
 
-class Mushaf:
-    def __init__(self, slug, name, source, collector_name, compiler_name):
+class Transmission:
+    def __init__(self, slug, name):
+        self.slug = slug
+        self.name = name
+
+
+class RasmOlMushaf:
+    def __init__(
+        self,
+        slug,
+        name,
+        source,
+        compiler_name,
+        transmission,
+    ):
         self.name = name
         self.slug = slug
         self.source = source
-        self.collector_name = collector_name
+        self.transmission = transmission
         self.compiler_name = compiler_name
 
 
