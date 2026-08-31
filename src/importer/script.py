@@ -7,7 +7,7 @@ import secrets
 import string
 
 TOKEN_FILE = os.path.expanduser("~/.importer_token")
-TAKHTIT_UUID_FILE = os.path.expanduser("~/.importer_takhtit_uuid")
+TAKHTIT_ID_FILE = os.path.expanduser("~/.importer_takhtit_id")
 
 
 # Send the file as multipart/form-data
@@ -65,16 +65,16 @@ def load_token():
     return None
 
 
-def save_takhtit_uuid(uuid):
+def save_takhtit_id(id):
     """Save takhtit UUID to file"""
-    with open(TAKHTIT_UUID_FILE, "w") as f:
-        f.write(uuid)
+    with open(TAKHTIT_ID_FILE, "w") as f:
+        f.write(id)
 
 
-def load_takhtit_uuid():
+def load_takhtit_id():
     """Load takhtit UUID from file"""
-    if os.path.exists(TAKHTIT_UUID_FILE):
-        with open(TAKHTIT_UUID_FILE, "r") as f:
+    if os.path.exists(TAKHTIT_ID_FILE):
+        with open(TAKHTIT_ID_FILE, "r") as f:
             return f.read().strip()
     return None
 
@@ -112,12 +112,12 @@ def create_user(api_url):
 
     generated_password = generate_strong_password()
     user_payload = {
-        "username": "uthmantaha",
+        "username": "nq_importer_py",
         "password": generated_password,
         "password2": generated_password,
         "email": "user@example.com",
-        "first_name": "Uthman",
-        "last_name": "Taha",
+        "first_name": "Importer",
+        "last_name": "NQ",
     }
 
     try:
@@ -126,9 +126,9 @@ def create_user(api_url):
         print(resp.status_code, resp.text)
         if resp.status_code == 201:
             user_data = resp.json()
-            account_uuid = user_data.get("uuid")
-            print(f"User created successfully. UUID: {account_uuid}")
-            return account_uuid
+            account_id = user_data.get("id")
+            print(f"User created successfully. UUID: {account_id}")
+            return account_id
         else:
             print("Failed to create user.")
             sys.exit(1)
@@ -137,7 +137,7 @@ def create_user(api_url):
         sys.exit(1)
 
 
-def create_takhtit(api_url):
+def create_takhtit(mushaf_slug, api_url):
     """Create a new takhtit with a newly created user"""
     token = load_token()
     if not token:
@@ -151,7 +151,7 @@ def create_takhtit(api_url):
     }
 
     # First create a new user and get the account UUID
-    account_uuid = create_user(api_url)
+    account_id = create_user(api_url)
 
     try:
         resp = requests.get(f"{api_url}/mushafs/", headers=headers)
@@ -163,17 +163,18 @@ def create_takhtit(api_url):
         print(f"Failed to fetch mushafs: {e}")
         sys.exit(1)
 
-    hafs_uuid = None
+    hafs_id = None
     for mushaf in mushafs:
-        if mushaf.get("slug") == "hafs":
-            hafs_uuid = mushaf.get("uuid")
+        if mushaf.get("slug") == mushaf_slug:
+            hafs_id = mushaf.get("id")
             break
 
-    if not hafs_uuid:
+    if not hafs_id:
         print("Could not find Mushaf with slug 'hafs'.")
         sys.exit(1)
 
-    payload = {"mushaf_uuid": hafs_uuid, "account_uuid": account_uuid}
+    payload = {"rasm_ol_mushaf": hafs_id, "account": account_id}
+    print(payload)
 
     try:
         response = requests.post(f"{api_url}/takhtits/", headers=headers, json=payload)
@@ -182,11 +183,11 @@ def create_takhtit(api_url):
 
         if response.status_code == 201:
             takhtit_data = response.json()
-            takhtit_uuid = takhtit_data.get("uuid")
-            if takhtit_uuid:
-                save_takhtit_uuid(takhtit_uuid)
-                print(f"Takhtit created successfully. UUID: {takhtit_uuid}")
-                print(f"Takhtit UUID saved to {TAKHTIT_UUID_FILE}")
+            takhtit_id = takhtit_data.get("id")
+            if takhtit_id:
+                save_takhtit_id(takhtit_id)
+                print(f"Takhtit created successfully. UUID: {takhtit_id}")
+                print(f"Takhtit UUID saved to {TAKHTIT_ID_FILE}")
             else:
                 print("Takhtit created but no UUID in response.")
         else:
@@ -204,9 +205,9 @@ def import_takhtit(file_path, type_name, api_url):
         sys.exit(1)
 
     # Load saved takhtit UUID
-    uuid = load_takhtit_uuid()
+    uuid = load_takhtit_id()
     if not uuid:
-        print("No takhtit UUID found. Please create a takhtit first.")
+        print("No takhtit ID found. Please create a takhtit first.")
         sys.exit(1)
 
     if not os.path.isfile(file_path):
@@ -389,10 +390,10 @@ def main(args):
             print(f"Failed to send file: {e}")
             sys.exit(1)
     elif command == "create-takhtit":
-        if len(args) != 3:
-            print("Usage: python script.py create-takhtit <api_url>")
+        if len(args) != 4:
+            print("Usage: python script.py create-takhtit <mushaf_slug> <api_url>")
             sys.exit(1)
-        create_takhtit(args[2])
+        create_takhtit(args[2], args[3])
     elif command == "import-takhtit":
         if len(args) != 5:
             print("Usage: python script.py import-takhtit <json_file> <type> <api_url>")
