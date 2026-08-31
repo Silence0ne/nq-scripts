@@ -71,10 +71,10 @@ def save_takhtit_id(id):
         f.write(id)
 
 
-def load_takhtit_uuid():
+def load_takhtit_id():
     """Load takhtit UUID from file"""
-    if os.path.exists(TAKHTIT_UUID_FILE):
-        with open(TAKHTIT_UUID_FILE, "r") as f:
+    if os.path.exists(TAKHTIT_ID_FILE):
+        with open(TAKHTIT_ID_FILE, "r") as f:
             return f.read().strip()
     return None
 
@@ -205,9 +205,9 @@ def import_takhtit(file_path, type_name, api_url):
         sys.exit(1)
 
     # Load saved takhtit UUID
-    uuid = load_takhtit_uuid()
+    uuid = load_takhtit_id()
     if not uuid:
-        print("No takhtit UUID found. Please create a takhtit first.")
+        print("No takhtit ID found. Please create a takhtit first.")
         sys.exit(1)
 
     if not os.path.isfile(file_path):
