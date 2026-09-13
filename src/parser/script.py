@@ -11,7 +11,7 @@ import os
 
 USAGE = """Natiq Quran Exporter
 Usage:
-    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <colllector_name> <compiler_name (nullable)> <transmission_slug> <transmission_name> [--pretty]
+    python script.py quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <collector_name> <compiler_name (nullable)> <transmission_slug> <transmission_name> [--pretty]
     python script.py translation <path_to_translation_xml_file> <mushaf_slug> <language> <author> [--pretty]
     python script.py translation-bulk <path_to_translations_dir> <output_dir> <mushaf_slug> [--pretty]
 """
