@@ -11,15 +11,25 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
+
+# --- Logging Functions ---
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Mushaf identifiers (used to build filenames/paths consistently)
 MUSHAF_SLUG="hafs"
 MUSHAF_FULL_NAME="Hafs an Asem"
 MUSHAF_SOURCE="tanzil"
+COLLECTOR_NAME=""
+COMPILER_NAME="null"
+TRANSMISSION_SLUG=""
+TRANSMISSION_NAME=""
 
 # Data file paths (relative to the "parser" directory)
-QURAN_XML="data/quran/quran-uthmani.xml"
+QURAN_XML_FILE="data/quran/quran-uthmani.xml"
 TRANSLATIONS_SRC_DIR="data/translations/tanzil/"
 TRANSLATIONS_OUT_DIR="translations"
 MUSHAF_OUTPUT_JSON="${MUSHAF_SLUG}.json"
@@ -29,12 +39,6 @@ PAGE_DIRECTORY="../parser/data/breakers/ayah_breakers/page.json"
 HIZB_DIRECTORY="../parser/data/breakers/ayah_breakers/hizb.json"
 JUZ_DIRECTORY="../parser/data/breakers/ayah_breakers/juz.json"
 
-# --- Logging Functions ---
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-
 # --- Cleanup ---
 cleanup() {
     log_warn "Cleaning up and deactivating virtualenv if active..."
@@ -42,9 +46,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Helper: run a python3 script.py command with proper error handling ---
-# (Avoids relying on "$?" after the fact, which is unreliable under `set -e`,
-#  since a non-zero exit would already terminate the script before the check runs.)
 run_step() {
     local description="$1"
     shift
@@ -55,7 +56,7 @@ run_step() {
     fi
 }
 
-# Navigate to the parent directory (project root, containing parser/ and importer/)
+# Navigate to the parent directory (containing parser/ and importer/)
 cd ..
 
 # --- Prerequisite Checks ---
@@ -132,12 +133,11 @@ source .venv/bin/activate
 log_info "Installing requirements..."
 pip install -r requirements.txt
 
-# --- Data Processing (parser) ---
 cd parser
 
-# quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> [--pretty]
+# quran <path_to_quran_xml_file> <mushaf_name> <mushaf_full_name> <mushaf_source> <collector_name> <compiler_name (nullable)> <transmission_slug> <transmission_name> [--pretty]
 run_step "Generating mushaf JSON (${MUSHAF_OUTPUT_JSON})..." \
-    python3 script.py quran "$QURAN_XML" "$MUSHAF_SLUG" "$MUSHAF_FULL_NAME" "$MUSHAF_SOURCE" --pretty
+    python3 script.py quran "$QURAN_XML_FILE" "$MUSHAF_SLUG" "$MUSHAF_FULL_NAME" "$MUSHAF_SOURCE" "$COLLECTOR_NAME" "$COMPILER_NAME" "$TRANSMISSION_SLUG" "$TRANSMISSION_NAME" --pretty
 
 # translation-bulk <path_to_translations_dir> <output_dir> <mushaf_slug> [--pretty]
 run_step "Generating bulk translations..." \
@@ -145,7 +145,6 @@ run_step "Generating bulk translations..." \
 
 cd ../importer
 
-# --- Data Import ---
 read -p "Server IP (e.g. http://localhost:8000): " SERVER_IP
 read -p "Username: " USERNAME
 read -s -p "Password: " PASSWORD
@@ -158,21 +157,28 @@ run_step "Logging in to server..." \
 # import-mushaf <input_json_file> <api_url>
 run_step "Importing mushaf..." \
     python3 script.py import-mushaf "../parser/${MUSHAF_OUTPUT_JSON}" "$SERVER_IP"
+log_info "Continued after 5s"
+sleep 5
 
 # import-translations <translations_dir> <api_url>
 run_step "Importing translations..." \
     python3 script.py import-translations "../parser/${TRANSLATIONS_OUT_DIR}" "$SERVER_IP"
+log_info "Continued after 20s"
+sleep 15
 
-# create-takhtit <api_url>
 run_step "Creating takhtit..." \
-    python3 script.py create-takhtit "$SERVER_IP"
+    python3 script.py create-takhtit "$MUSHAF_SLUG" "$SERVER_IP"
 
 # import-takhtit <json_file> <type> <api_url>
 run_step "Importing pages..." \
     python3 script.py import-takhtit "$PAGE_DIRECTORY" "page" "$SERVER_IP"
+log_info "Continued after 5s"
+sleep 5
 
 run_step "Importing hizb..." \
     python3 script.py import-takhtit "$HIZB_DIRECTORY" "hizb" "$SERVER_IP"
+log_info "Continued after 5s"
+sleep 5
 
 run_step "Importing juz..." \
     python3 script.py import-takhtit "$JUZ_DIRECTORY" "juz" "$SERVER_IP"
