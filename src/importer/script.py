@@ -248,7 +248,7 @@ def main(args):
         print("  import-mushaf <input_json_file> <api_url>")
         print("  import-translations <translations_dir> <api_url>")
         print("  import-translation <input_json_file> <api_url>")
-        print("  create-takhtit <api_url>")
+        print("  create-takhtit <mushaf_slug> <api_url>")
         print("  import-takhtit <json_file> <type> <api_url>")
         sys.exit(1)
 
